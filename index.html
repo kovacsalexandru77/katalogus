@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>mozi-katalogus</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
+  <style>
+    body { margin:0; background:black; color:white; font-family:Arial; }
+    header {
+      background: rgba(0,0,0,0.85);
+      padding:10px 20px;
+      display:flex;
+      justify-content:flex-start;
+      align-items:center;
+      gap: 20px;
+      position:sticky;
+      top:0;
+      z-index:1000;
+      margin-left: 60px;
+    }
+    h1 { margin:0; color:cyan; font-size:22px; }
+    #categorySelect {
+      padding:6px 10px;
+      font-size:15px;
+      background:rgba(0,0,0,0.6);
+      color:white;
+      border:2px solid cyan;
+      border-radius:6px;
+    }
+    #movies {
+      display:grid;
+      grid-template-columns:repeat(5, 1fr);
+      gap:15px;
+      padding:15px;
+      margin-left: 60px;
+    }
+    .movie {
+      background:rgba(0,0,0,0.6);
+      border:2px solid deepskyblue;
+      border-radius:10px;
+      overflow:hidden;
+      cursor:pointer;
+      transition:0.3s;
+    }
+    .movie:hover {
+      transform:scale(1.05);
+      box-shadow:0 0 15px cyan;
+    }
+    .movie img {
+      width:100%;
+      height:240px;
+      object-fit:cover;
+      display:block;
+    }
+    .movie-title {
+      text-align:center;
+      padding:8px;
+      font-size:14px;
+      color:cyan;
+    }
+    #preloader {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px 40px;
+      border-radius: 12px;
+      text-align: center;
+      user-select: none;
+      pointer-events: none;
+    }
+    .txt-loading {
+      font-size: 28px;
+      font-weight: bold;
+      color: #00ff00;
+      text-shadow: 0 0 8px #00ff00, 0 0 20px #00ff00;
+      animation: pulse 1.5s infinite;
+      letter-spacing: 0.1em;
+      user-select: none;
+    }
+    .letters-loading {
+      display: inline-block;
+      animation: blink 1.2s infinite alternate;
+    }
+    .letters-loading:nth-child(1) { animation-delay: 0s; }
+    .letters-loading:nth-child(2) { animation-delay: 0.2s; }
+    .letters-loading:nth-child(3) { animation-delay: 0.4s; }
+    .letters-loading:nth-child(4) { animation-delay: 0.6s; }
+    .letters-loading:nth-child(5) { animation-delay: 0.8s; }
+    .letters-loading:nth-child(6) { animation-delay: 1.0s; }
+    .letters-loading:nth-child(7) { animation-delay: 1.2s; }
+    .letters-loading:nth-child(8) { animation-delay: 1.4s; }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+    @keyframes blink {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    /* Sidebar, clock és többi stílus változatlanul maradt, csak a színek zöld neonra */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 60px;
+      background-color: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 8px;
+      z-index: 1000;
+    }
+    .sidebar a {
+      color: #00ff00;
+      font-size: 24px;
+      margin: 8px 0;
+      transition: transform 0.3s, color 0.3s, text-shadow 0.3s;
+      text-decoration:none;
+    }
+    .sidebar a:hover {
+      color: #00ff00;
+      transform: scale(1.3);
+      text-shadow: 0 0 12px #00ff00;
+    }
+     .clock {
+      position: fixed;
+      top: 4px;
+      right: 17px;
+      font-size: 16px;
+      color: cyan !important;
+      font-weight: bold;
+      z-index: 1100;
+      text-shadow: 0 0 8px cyan;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    #playerModal {
+      position:fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      background:rgba(0,0,0,0.95);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      z-index:9999;
+    }
+    #playerModal.show { display:flex; }
+    #playerIframe {
+      width:100%;
+      height:95vh;
+      border:none;
+      background:black;
+    }
+    #episodeButtons {
+      margin-top:20px;
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+    #episodeButtons button {
+      margin: 4px;
+      padding: 6px 10px;
+      background: cyan;
+      color: black;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 0 5px cyan;
+    }
+    #episodeButtons button:hover {
+      box-shadow: 0 0 12px cyan;
+    }
+    #closeBtn {
+      position:absolute;
+      bottom:20px;
+      right:30px;
+      font-size:20px;
+      color:white;
+      border-radius:50%;
+      padding:5px 10px;
+      cursor:pointer;
+      transition: 0.3s;
+    }
+    #closeBtn:hover {
+      background:red;
+      box-shadow:0 0 15px #ff4040;
+      transform: scale(1.1);
+    }
+    #episodeButtons .episode-btn {
+  margin: 4px;
+  padding: 8px 14px;
+  background: black;
+  color: cyan;
+  border: 2px solid cyan;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 0 8px cyan;
+  transition: 0.2s;
+}
+#episodeButtons .episode-btn:hover {
+  background: cyan;
+  color: black;
+  box-shadow: 0 0 15px cyan;
+}
+#episodeButtons .episode-btn.active {
+  background: cyan;
+  color: black;
+  box-shadow: 0 0 20px cyan;
+  transform: scale(1.1);
+}
+
+/* marad a hover effekt is */
+#episodeButtons .episode-btn:hover {
+  background: cyan;
+  color: black;
+  box-shadow: 0 0 15px cyan;
+}
+.sidebar a i {
+  font-size: 28px;
+  animation: neonCycle 3s linear infinite;
+}
+
+@keyframes neonCycle {
+  0%   { color: cyan;    text-shadow: 0 0 5px cyan, 0 0 10px cyan; }
+  25%  { color: lime;    text-shadow: 0 0 5px lime, 0 0 10px lime; }
+  50%  { color: yellow;  text-shadow: 0 0 5px yellow, 0 0 10px yellow; }
+  75%  { color: magenta; text-shadow: 0 0 5px magenta, 0 0 10px magenta; }
+  100% { color: cyan;    text-shadow: 0 0 5px cyan, 0 0 10px cyan; }
+}
+
+/* minden ikonra növekvő delay */
+.sidebar a:nth-child(1) i { animation-delay: 0s; }
+.sidebar a:nth-child(2) i { animation-delay: 0.2s; }
+.sidebar a:nth-child(3) i { animation-delay: 0.4s; }
+.sidebar a:nth-child(4) i { animation-delay: 0.6s; }
+.sidebar a:nth-child(5) i { animation-delay: 0.8s; }
+.sidebar a:nth-child(6) i { animation-delay: 1s; }
+.sidebar a:nth-child(7) i { animation-delay: 1.2s; }
+/* ... és így tovább a többi ikonhoz */
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/filmek')" title="Új filmek"><i class="bi bi-film"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/netflix')" title="NETFLIX"><i class="bi bi-collection-play"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/akcio/')" title="Akció"><i class="bi bi-lightning-fill"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/animacios/')" title="Animációs"><i class="bi bi-palette-fill"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/misztikus/')" title="Misztikus"><i class="bi bi-house-heart"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/drama/')" title="Dráma"><i class="bi bi-theater-masks"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/horror/')" title="Horror"><i class="bi bi-emoji-dizzy"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/kalandfilm/')" title="Kaland"><i class="bi bi-compass"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/krimi/')" title="Krimi"><i class="bi bi-shield-lock"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/thriller/')" title="Thriller"><i class="bi bi-lightning"></i></a>
+  <a href="#" onclick="changeCategory('https://mozikatalogus.hu/kategoria/vigjatek/')" title="Vígjáték"><i class="bi bi-emoji-smile"></i></a>
+</div>
+
+<header>
+  <select id="categorySelect" onchange="changeCategory(this.value)">
+    <option value="https://mozikatalogus.hu/filmek">📽 FILMEK</option>
+    <option value="https://mozikatalogus.hu/kategoria/netflix">📺 NETFLIX</option>
+    <option value="https://mozikatalogus.hu/kategoria/akcio/">Akció</option>
+    <option value="https://mozikatalogus.hu/kategoria/animacios/">Animációs</option>
+    <option value="https://mozikatalogus.hu/kategoria/misztikus/">Misztikus</option>
+    <option value="https://mozikatalogus.hu/kategoria/drama/">Dráma</option>
+    <option value="https://mozikatalogus.hu/kategoria/horror/">Horror</option>
+    <option value="https://mozikatalogus.hu/kategoria/kalandfilm/">Kaland</option>
+    <option value="https://mozikatalogus.hu/kategoria/krimi/">Krimi</option>
+    <option value="https://mozikatalogus.hu/kategoria/thriller/">Thriller</option>
+    <option value="https://mozikatalogus.hu/kategoria/vigjatek/">Vígjáték</option>
+  </select>
+  <h1>●𝕄𝕠𝕫𝕚𝕜𝕒𝕥𝕒𝕝𝕠𝕘𝕦𝕤 Sᴀɴᴅᴜ▶</h1>
+  <div class="clock" id="clock">--:--:--</div>
+</header>
+
+<!-- Preloader -->
+<div id="preloader">
+  <div class="txt-loading">
+    <span class="letters-loading">ʟ</span>
+    <span class="letters-loading">ᴏ</span>
+    <span class="letters-loading">ᴀ</span>
+    <span class="letters-loading">ᴅ</span>
+    <span class="letters-loading">ɪ</span>
+    <span class="letters-loading">ɴ</span>
+    <span class="letters-loading">ɢ</span>
+  </div>
+</div>
+
+<div id="movies"></div>
+<div id="loadMoreBtn" style="text-align:center; margin: 20px 0 40px 80px;">
+  <button onclick="loadMoreMovies()" style="padding:10px 20px; font-size:16px; background:#00ff00; color:black; border:none; border-radius:8px; cursor:pointer; box-shadow:0 0 10px #00ff00;">
+    TőBBᕗ
+  </button>
+</div>
+
+<div id="playerModal">
+  <iframe id="playerIframe" allowfullscreen allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+  <div id="episodeButtons"></div>
+  <div id="closeBtn" onclick="closeModal()">✕</div>
+</div>
+
+<script>
+const proxy = "https://api.allorigins.win/get?url=";
+let currentCategory = "https://mozikatalogus.hu/filmek?page=";
+let currentPage = 1;
+
+/* ---------- UI ---------- */
+function updateClock() {
+  const now = new Date();
+  const el = document.getElementById("clock");
+  if (el) el.textContent = now.toLocaleTimeString("hu-HU", { hour12: false });
+}
+setInterval(updateClock, 1000); updateClock();
+
+function changeCategory(url) {
+  currentCategory = url;
+  currentPage = 1;
+  const grid = document.getElementById("movies");
+  if (grid) grid.innerHTML = "";
+  const select = document.getElementById("categorySelect");
+  if (select) select.value = url;
+  fetchMovies(currentPage);
+}
+
+function loadMoreMovies() {
+  currentPage++;
+  fetchMovies(currentPage);
+}
+
+/* ---------- Segédek ---------- */
+function absUrl(u, base) {
+  try { return new URL(u, base).href; } catch { return u; }
+}
+function pageUrlFromCategory(base, page){
+  const b = String(base);
+  if (b.includes("cinenuovo.hu")) {
+    // cinenuovo: /page/N/ stílus
+    return (b.endsWith("/") ? b : b + "/") + "page/" + page + "/";
+  } else {
+    // mozikatalogus: ?page=N (kategóriák és listák)
+    return b.includes("?") ? (b + "&page=" + page) : (b + "?page=" + page);
+  }
+}
+
+/* ---------- LISTÁZÁS ---------- */
+function fetchMovies(page = 1) {
+  const pre = document.getElementById("preloader");
+  if (pre) pre.style.display = "block";
+
+  const url = pageUrlFromCategory(currentCategory, page);
+
+  fetch(proxy + encodeURIComponent(url))
+    .then(r => r.json())
+    .then(data => {
+      const doc = new DOMParser().parseFromString(data.contents, "text/html");
+      const container = document.getElementById("movies");
+      if (!container) return;
+
+      let rendered = 0;
+
+      /* --- mozikatalogus.hu: <film-card-component :film="..."> --- */
+      const filmCards = doc.querySelectorAll("film-card-component");
+      filmCards.forEach(item => {
+        const raw = item.getAttribute(":film");
+        if (!raw) return;
+        let film;
+        try { film = JSON.parse(raw.replace(/&quot;/g, '"')); }
+        catch { return; }
+
+        const title = film.hungarian_title || film.original_title || "Ismeretlen cím";
+        let img = film.img || film.poster || film.cover;
+        if (img) img = absUrl(img, "https://mozikatalogus.hu");
+        const slug = film.slug ? String(film.slug) : "";
+        const detailsLink = slug ? ("https://mozikatalogus.hu/film/" + slug) : null;
+
+        const card = document.createElement("div");
+        card.className = "movie";
+        card.title = title;
+
+        const imgEl = document.createElement("img");
+        imgEl.alt = title;
+        imgEl.loading = "lazy";
+        imgEl.referrerPolicy = "no-referrer";
+        imgEl.src = img || "https://via.placeholder.com/400x600?text=Nincs+k%C3%A9p";
+        card.appendChild(imgEl);
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "movie-title";
+        titleEl.textContent = title;
+        card.appendChild(titleEl);
+
+        card.onclick = () => loadPlayerFromFilm(film, detailsLink);
+
+        container.appendChild(card);
+        rendered++;
+      });
+
+      /* --- cinenuovo.hu: <article class="post"> --- */
+      const posts = doc.querySelectorAll("article.post");
+      posts.forEach(post => {
+        const a = post.querySelector("h2 a");
+        if (!a) return;
+        const link = a.href;
+        const title = (a.textContent || "").trim();
+
+        // képek: src vagy data-src (lazy)
+        const imgTag = post.querySelector("img");
+        let img = imgTag?.getAttribute("src") || imgTag?.getAttribute("data-src");
+        if (img) img = absUrl(img, "https://www.cinenuovo.hu");
+
+        const card = document.createElement("div");
+        card.className = "movie";
+        card.title = title || "Részletek";
+
+        const imgEl = document.createElement("img");
+        imgEl.alt = title || "Borítókép";
+        imgEl.loading = "lazy";
+        imgEl.referrerPolicy = "no-referrer";
+        imgEl.src = img || "https://via.placeholder.com/400x600?text=Nincs+k%C3%A9p";
+        card.appendChild(imgEl);
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "movie-title";
+        titleEl.textContent = title || "Ismeretlen cím";
+        card.appendChild(titleEl);
+
+        card.onclick = () => loadPlayerFromPage(link);
+
+        container.appendChild(card);
+        rendered++;
+      });
+
+      if (rendered === 0) {
+        console.warn("Nem találtam megjeleníthető elemet ennél az URL-nél:", url);
+      }
+    })
+    .catch(err => console.error("fetchMovies hiba:", err))
+    .finally(() => { const pre = document.getElementById("preloader"); if (pre) pre.style.display = "none"; });
+}
+
+/* ---------- PLAYER ---------- */
+const ALLOW_HOSTS = ["videa.hu", "ok.ru", "odnoklassniki.ru"];
+const BLOCK_HOSTS = ["vidoza."]; // bármely vidoza TLD
+
+function normalizeSrc(u) {
+  if (!u) return "";
+  let src = String(u).trim();
+  if (src.startsWith("//")) src = "https:" + src;
+  return src.replace(/^['"]|['"]$/g, "");
+}
+function ensureAutoplay(u) {
+  if (!u) return "";
+  return u.includes("autoplay=1") ? u : (u + (u.includes("?") ? "&" : "?") + "autoplay=1");
+}
+function hostOf(u) {
+  try { return new URL(u).hostname.replace(/^www\./,""); } catch { return ""; }
+}
+function isAllowedHost(u) {
+  const h = hostOf(u);
+  if (!h) return false;
+  if (BLOCK_HOSTS.some(b => h.includes(b))) return false;
+  return ALLOW_HOSTS.some(a => h.endsWith(a));
+}
+// OK.ru oldallink → embed
+function toEmbedUrl(u) {
+  const h = hostOf(u);
+  if (!h) return "";
+  let out = u;
+  if (h.endsWith("ok.ru") || h.endsWith("odnoklassniki.ru")) {
+    out = out.replace(/\/video\/(\d+)/, "/videoembed/$1");
+  }
+  if (h.endsWith("videa.hu")) {
+    // csak a /player?v=... formátumot engedjük
+    if (!/\/player\?v=/.test(out)) return "";
+  }
+  return out;
+}
+
+function extractUrlsFromObject(obj, acc = new Set()) {
+  if (obj == null) return acc;
+  const rx = /\bhttps?:\/\/[^\s"'<>]+/g;
+  if (typeof obj === "string") {
+    let m; while ((m = rx.exec(obj)) !== null) acc.add(normalizeSrc(m[0]));
+  } else if (Array.isArray(obj)) {
+    obj.forEach(v => extractUrlsFromObject(v, acc));
+  } else if (typeof obj === "object") {
+    Object.values(obj).forEach(v => extractUrlsFromObject(v, acc));
+  }
+  return acc;
+}
+
+/* --------- RÉSZLETEK OLDAL BEJÁRÁSA (ABSZOLÚT LINKKÉPZÉS!) --------- */
+async function findLinksInDetailPage(detailUrl) {
+  if (!detailUrl) return [];
+  try {
+    const res = await fetch(proxy + encodeURIComponent(detailUrl));
+    const data = await res.json();
+    const doc = new DOMParser().parseFromString(data.contents, "text/html");
+    const urls = new Set();
+    const base = detailUrl; // a relatív <a> és <iframe> ehhez képest legyen abszolút
+
+    // <a href> (relatívból abszolút)
+    doc.querySelectorAll("a[href]").forEach(a => {
+      const href = a.getAttribute("href");
+      if (href) urls.add(normalizeSrc(absUrl(href, base)));
+    });
+
+    // <iframe src> (relatívból abszolút)
+    doc.querySelectorAll("iframe[src]").forEach(f => {
+      const src = f.getAttribute("src");
+      if (src) urls.add(normalizeSrc(absUrl(src, base)));
+    });
+
+    // onclick-okból is URL-ek (itt tipikusan abszolútak)
+    doc.querySelectorAll("[onclick]").forEach(el => {
+      const txt = el.getAttribute("onclick") || "";
+      const rx = /\bhttps?:\/\/[^\s"'<>]+/g;
+      let m; while ((m = rx.exec(txt)) !== null) urls.add(normalizeSrc(m[0]));
+    });
+
+    return Array.from(urls);
+  } catch (e) {
+    console.error("findLinksInDetailPage hiba:", e);
+    return [];
+  }
+}
+
+function pickPlayable(allUrls) {
+  const seen = new Set();
+  const playable = [];
+  allUrls.forEach(u => {
+    const n = normalizeSrc(u);
+    if (!n) return;
+    if (!isAllowedHost(n)) return;
+    const embed = toEmbedUrl(n);
+    if (!embed) return;
+    const finalUrl = ensureAutoplay(embed);
+    if (!seen.has(finalUrl)) {
+      seen.add(finalUrl);
+      const h = hostOf(finalUrl);
+      const label = h.includes("videa.hu") ? "Videa" :
+                    (h.includes("ok.ru")||h.includes("odnoklassniki.ru") ? "OK.ru" : ("Forrás: " + h));
+      playable.push({ label, url: finalUrl });
+    }
+  });
+  return playable;
+}
+
+/* --------- SxxEyy felismerése + epizód URL detektálás --------- */
+function parseSeasonEpisode(u) {
+  try {
+    const path = new URL(u).pathname.toLowerCase();
+    const m = path.match(/\/(\d+)-evad\/(\d+)-resz/);
+    if (m) return { s: parseInt(m[1], 10), e: parseInt(m[2], 10) };
+  } catch {}
+  return null;
+}
+function isMoziEpisodeLink(u) {
+  try {
+    const url = new URL(u);
+    if (!url.hostname.endsWith("mozikatalogus.hu")) return false;
+    return /\/\d+-evad\/\d+-resz/i.test(url.pathname);
+  } catch { return false; }
+}
+
+/* ---------- PLAYER: FILM (VÁLTOZATLAN LOGIKA) ---------- */
+async function loadPlayerFromFilm(film, fallbackLink) {
+  const iframe = document.getElementById("playerIframe");
+  const epWrap = document.getElementById("episodeButtons");
+  const modal  = document.getElementById("playerModal");
+  const pre    = document.getElementById("preloader");
+
+  if (pre) pre.style.display = "block";
+  if (epWrap) epWrap.innerHTML = "";
+
+  const fromFilm = Array.from(extractUrlsFromObject(film));
+  let playable = pickPlayable(fromFilm);
+
+  if (playable.length === 0 && fallbackLink) {
+    const fromDetail = await findLinksInDetailPage(fallbackLink);
+    playable = pickPlayable(fromDetail);
+  }
+
+  if (playable.length > 0) {
+    if (iframe) iframe.src = playable[0].url;
+    if (epWrap && playable.length > 1) {
+      playable.forEach((p,i) => {
+        const b = document.createElement("button");
+        b.className = "episode-btn" + (i === 0 ? " active" : "");
+        b.textContent = p.label || ("Forrás " + (i+1));
+        b.onclick = (e) => {
+          e.preventDefault();
+          if (iframe) iframe.src = p.url;
+          document.querySelectorAll("#episodeButtons .episode-btn").forEach(btn => btn.classList.remove("active"));
+          b.classList.add("active");
+        };
+        epWrap.appendChild(b);
+      });
+    }
+    if (modal) modal.classList.add("show");
+  } else {
+    console.warn("Nincs támogatott lejátszható forrás (Videa/OK.ru).");
+  }
+
+  if (pre) pre.style.display = "none";
+}
+
+/* ---------- PLAYER: OLDAL (SOROZAT EPIZÓDOK BEJÁRÁSA) ---------- */
+async function loadPlayerFromPage(detailUrl) {
+  const iframe = document.getElementById("playerIframe");
+  const epWrap = document.getElementById("episodeButtons");
+  const modal  = document.getElementById("playerModal");
+  const pre    = document.getElementById("preloader");
+
+  if (pre) pre.style.display = "block";
+  if (epWrap) epWrap.innerHTML = "";
+
+  // 1) Részletoldal: közvetlen források (ha film vagy egyből van iframe)
+  const fromDetail = await findLinksInDetailPage(detailUrl);
+  let playable = pickPlayable(fromDetail);
+
+  // 2) Sorozat: epizód linkek kigyűjtése és epizódoldalak bejárása
+  const episodeLinks = fromDetail.filter(isMoziEpisodeLink);
+  if (episodeLinks.length) {
+    const epResults = await Promise.all(episodeLinks.map(async (epUrl) => {
+      const sub = await findLinksInDetailPage(epUrl);
+      const list = pickPlayable(sub);
+      const se = parseSeasonEpisode(epUrl);
+      const prefix = se ? `S${String(se.s).padStart(2,"0")}E${String(se.e).padStart(2,"0")}` : "Epizód";
+      return list.map(p => ({ url: p.url, label: `${prefix} · ${p.label || "Forrás"}` }));
+    }));
+
+    const seen = new Set(playable.map(x => x.url));
+    epResults.flat().forEach(p => {
+      if (!seen.has(p.url)) { seen.add(p.url); playable.push(p); }
+    });
+
+    // SxxEyy szerint rendezés, ha van
+    playable.sort((a,b) => {
+      const ma = a.label.match(/S(\d+)E(\d+)/);
+      const mb = b.label.match(/S(\d+)E(\d+)/);
+      if (ma && mb) {
+        const sa = parseInt(ma[1],10), ea = parseInt(ma[2],10);
+        const sb = parseInt(mb[1],10), eb = parseInt(mb[2],10);
+        if (sa !== sb) return sa - sb;
+        if (ea !== eb) return ea - eb;
+      }
+      return a.label.localeCompare(b.label);
+    });
+  }
+
+  // 3) Lejátszó + gombok
+  if (playable.length > 0) {
+    if (iframe) iframe.src = playable[0].url;
+
+    if (epWrap && playable.length > 1) {
+      playable.forEach((p,i) => {
+        const b = document.createElement("button");
+        b.className = "episode-btn" + (i === 0 ? " active" : "");
+        b.textContent = p.label || ("Forrás " + (i+1));
+        b.onclick = (e) => {
+          e.preventDefault();
+          if (iframe) iframe.src = p.url;
+          document.querySelectorAll("#episodeButtons .episode-btn").forEach(btn => btn.classList.remove("active"));
+          b.classList.add("active");
+        };
+        epWrap.appendChild(b);
+      });
+    }
+    if (modal) modal.classList.add("show");
+  } else {
+    console.warn("Nincs támogatott lejátszható forrás ezen az oldalon.");
+  }
+
+  if (pre) pre.style.display = "none";
+}
+
+function closeModal() {
+  const modal = document.getElementById("playerModal");
+  const iframe = document.getElementById("playerIframe");
+  const epWrap = document.getElementById("episodeButtons");
+  if (modal) modal.classList.remove("show");
+  if (iframe) iframe.src = "";
+  if (epWrap) epWrap.innerHTML = "";
+}
+
+/* ---------- INIT ---------- */
+fetchMovies();
+</script>
+</body>
+</html>
