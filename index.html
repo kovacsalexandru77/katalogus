@@ -278,7 +278,7 @@
     <option value="https://mozikatalogus.hu/kategoria/thriller/">Thriller</option>
     <option value="https://mozikatalogus.hu/kategoria/vigjatek/">Vígjáték</option>
   </select>
-  <h1>●𝕄𝕠𝕫𝕚𝕜𝕒𝕥𝕒𝕝𝕠𝕘𝕦𝕤 Sᴀɴᴅᴜ▶</h1>
+  <h1>𝕄𝕠𝕫𝕚𝕜𝕒𝕥𝕒𝕝𝕠𝕘𝕦𝕤 Sᴀɴᴅᴜ▶</h1>
   <div class="clock" id="clock">--:--:--</div>
 </header>
 
@@ -309,18 +309,20 @@
 </div>
 
 <script>
-const proxy = "https://api.allorigins.win/get?url=";
-let currentCategory = "https://mozikatalogus.hu/filmek?page=";
+const proxy = "https://api.codetabs.com/v1/proxy?quest=";
+let currentCategory = "https://mozikatalogus.hu/filmek";
 let currentPage = 1;
 
-/* ---------- UI ---------- */
+/* -------- ÓRA -------- */
 function updateClock() {
   const now = new Date();
   const el = document.getElementById("clock");
   if (el) el.textContent = now.toLocaleTimeString("hu-HU", { hour12: false });
 }
-setInterval(updateClock, 1000); updateClock();
+setInterval(updateClock, 1000);
+updateClock();
 
+/* -------- KATEGÓRIA VÁLTÁS -------- */
 function changeCategory(url) {
   currentCategory = url;
   currentPage = 1;
@@ -336,121 +338,10 @@ function loadMoreMovies() {
   fetchMovies(currentPage);
 }
 
-/* ---------- Segédek ---------- */
+/* -------- SEGÉD -------- */
 function absUrl(u, base) {
   try { return new URL(u, base).href; } catch { return u; }
 }
-function pageUrlFromCategory(base, page){
-  const b = String(base);
-  if (b.includes("cinenuovo.hu")) {
-    // cinenuovo: /page/N/ stílus
-    return (b.endsWith("/") ? b : b + "/") + "page/" + page + "/";
-  } else {
-    // mozikatalogus: ?page=N (kategóriák és listák)
-    return b.includes("?") ? (b + "&page=" + page) : (b + "?page=" + page);
-  }
-}
-
-/* ---------- LISTÁZÁS ---------- */
-function fetchMovies(page = 1) {
-  const pre = document.getElementById("preloader");
-  if (pre) pre.style.display = "block";
-
-  const url = pageUrlFromCategory(currentCategory, page);
-
-  fetch(proxy + encodeURIComponent(url))
-    .then(r => r.json())
-    .then(data => {
-      const doc = new DOMParser().parseFromString(data.contents, "text/html");
-      const container = document.getElementById("movies");
-      if (!container) return;
-
-      let rendered = 0;
-
-      /* --- mozikatalogus.hu: <film-card-component :film="..."> --- */
-      const filmCards = doc.querySelectorAll("film-card-component");
-      filmCards.forEach(item => {
-        const raw = item.getAttribute(":film");
-        if (!raw) return;
-        let film;
-        try { film = JSON.parse(raw.replace(/&quot;/g, '"')); }
-        catch { return; }
-
-        const title = film.hungarian_title || film.original_title || "Ismeretlen cím";
-        let img = film.img || film.poster || film.cover;
-        if (img) img = absUrl(img, "https://mozikatalogus.hu");
-        const slug = film.slug ? String(film.slug) : "";
-        const detailsLink = slug ? ("https://mozikatalogus.hu/film/" + slug) : null;
-
-        const card = document.createElement("div");
-        card.className = "movie";
-        card.title = title;
-
-        const imgEl = document.createElement("img");
-        imgEl.alt = title;
-        imgEl.loading = "lazy";
-        imgEl.referrerPolicy = "no-referrer";
-        imgEl.src = img || "https://via.placeholder.com/400x600?text=Nincs+k%C3%A9p";
-        card.appendChild(imgEl);
-
-        const titleEl = document.createElement("div");
-        titleEl.className = "movie-title";
-        titleEl.textContent = title;
-        card.appendChild(titleEl);
-
-        card.onclick = () => loadPlayerFromFilm(film, detailsLink);
-
-        container.appendChild(card);
-        rendered++;
-      });
-
-      /* --- cinenuovo.hu: <article class="post"> --- */
-      const posts = doc.querySelectorAll("article.post");
-      posts.forEach(post => {
-        const a = post.querySelector("h2 a");
-        if (!a) return;
-        const link = a.href;
-        const title = (a.textContent || "").trim();
-
-        // képek: src vagy data-src (lazy)
-        const imgTag = post.querySelector("img");
-        let img = imgTag?.getAttribute("src") || imgTag?.getAttribute("data-src");
-        if (img) img = absUrl(img, "https://www.cinenuovo.hu");
-
-        const card = document.createElement("div");
-        card.className = "movie";
-        card.title = title || "Részletek";
-
-        const imgEl = document.createElement("img");
-        imgEl.alt = title || "Borítókép";
-        imgEl.loading = "lazy";
-        imgEl.referrerPolicy = "no-referrer";
-        imgEl.src = img || "https://via.placeholder.com/400x600?text=Nincs+k%C3%A9p";
-        card.appendChild(imgEl);
-
-        const titleEl = document.createElement("div");
-        titleEl.className = "movie-title";
-        titleEl.textContent = title || "Ismeretlen cím";
-        card.appendChild(titleEl);
-
-        card.onclick = () => loadPlayerFromPage(link);
-
-        container.appendChild(card);
-        rendered++;
-      });
-
-      if (rendered === 0) {
-        console.warn("Nem találtam megjeleníthető elemet ennél az URL-nél:", url);
-      }
-    })
-    .catch(err => console.error("fetchMovies hiba:", err))
-    .finally(() => { const pre = document.getElementById("preloader"); if (pre) pre.style.display = "none"; });
-}
-
-/* ---------- PLAYER ---------- */
-const ALLOW_HOSTS = ["videa.hu", "ok.ru", "odnoklassniki.ru"];
-const BLOCK_HOSTS = ["vidoza."]; // bármely vidoza TLD
-
 function normalizeSrc(u) {
   if (!u) return "";
   let src = String(u).trim();
@@ -464,13 +355,18 @@ function ensureAutoplay(u) {
 function hostOf(u) {
   try { return new URL(u).hostname.replace(/^www\./,""); } catch { return ""; }
 }
+
+/* -------- LEJÁTSZÓ HOST -------- */
+const ALLOW_HOSTS = ["videa.hu", "ok.ru", "odnoklassniki.ru"];
+const BLOCK_HOSTS = ["vidoza."];
+
 function isAllowedHost(u) {
   const h = hostOf(u);
   if (!h) return false;
   if (BLOCK_HOSTS.some(b => h.includes(b))) return false;
   return ALLOW_HOSTS.some(a => h.endsWith(a));
 }
-// OK.ru oldallink → embed
+
 function toEmbedUrl(u) {
   const h = hostOf(u);
   if (!h) return "";
@@ -478,10 +374,7 @@ function toEmbedUrl(u) {
   if (h.endsWith("ok.ru") || h.endsWith("odnoklassniki.ru")) {
     out = out.replace(/\/video\/(\d+)/, "/videoembed/$1");
   }
-  if (h.endsWith("videa.hu")) {
-    // csak a /player?v=... formátumot engedjük
-    if (!/\/player\?v=/.test(out)) return "";
-  }
+  if (h.endsWith("videa.hu") && !/\/player\?v=/.test(out)) return "";
   return out;
 }
 
@@ -498,35 +391,90 @@ function extractUrlsFromObject(obj, acc = new Set()) {
   return acc;
 }
 
-/* --------- RÉSZLETEK OLDAL BEJÁRÁSA (ABSZOLÚT LINKKÉPZÉS!) --------- */
+/* -------- FILMEK BETÖLTÉSE -------- */
+async function fetchMovies(page = 1) {
+  const pre = document.getElementById("preloader");
+  if (pre) pre.style.display = "block";
+  const container = document.getElementById("movies");
+  if (!container) return;
+
+  const url = currentCategory + "?page=" + page;
+  try {
+    const res = await fetch(proxy + encodeURIComponent(url));
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    let rendered = 0;
+
+    const filmCards = doc.querySelectorAll("film-card-component, article.post");
+    filmCards.forEach(item => {
+      let title = "Ismeretlen cím";
+      let img = "";
+      let detailsLink = "";
+
+      const raw = item.getAttribute(":film");
+      if (raw) {
+        try {
+          const json = JSON.parse(raw.replace(/&quot;/g,'"'));
+          title = json.hungarian_title || json.original_title || title;
+          img = json.img || json.poster || json.cover || "";
+          if (json.slug) detailsLink = "https://mozikatalogus.hu/film/" + json.slug;
+        } catch {}
+      }
+
+      if (!img) {
+        const imgTag = item.querySelector("img");
+        if (imgTag) img = imgTag.getAttribute("src") || imgTag.getAttribute("data-src");
+      }
+      if (!img) img = "https://via.placeholder.com/400x600?text=Nincs+k%C3%A9p";
+
+      const card = document.createElement("div");
+      card.className = "movie";
+      card.title = title;
+
+      const imgEl = document.createElement("img");
+      imgEl.alt = title;
+      imgEl.loading = "lazy";
+      imgEl.referrerPolicy = "no-referrer";
+      imgEl.src = img.startsWith("http") ? img : "https://mozikatalogus.hu" + img;
+      card.appendChild(imgEl);
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "movie-title";
+      titleEl.textContent = title;
+      card.appendChild(titleEl);
+
+      card.onclick = () => loadPlayerFromFilm(item.getAttribute(":film") ? JSON.parse(item.getAttribute(":film").replace(/&quot;/g,'"')) : {}, detailsLink);
+      container.appendChild(card);
+      rendered++;
+    });
+
+    if (rendered === 0) console.warn("Nem talált filmeket:", url);
+  } catch (err) {
+    console.error("fetchMovies hiba:", err);
+  } finally {
+    if (pre) pre.style.display = "none";
+  }
+}
+
+/* -------- OLDAL LINK KERESÉS -------- */
 async function findLinksInDetailPage(detailUrl) {
-  if (!detailUrl) return [];
   try {
     const res = await fetch(proxy + encodeURIComponent(detailUrl));
     const data = await res.json();
     const doc = new DOMParser().parseFromString(data.contents, "text/html");
     const urls = new Set();
-    const base = detailUrl; // a relatív <a> és <iframe> ehhez képest legyen abszolút
+    const base = detailUrl;
 
-    // <a href> (relatívból abszolút)
-    doc.querySelectorAll("a[href]").forEach(a => {
-      const href = a.getAttribute("href");
-      if (href) urls.add(normalizeSrc(absUrl(href, base)));
+    doc.querySelectorAll("a[href], iframe[src], [onclick]").forEach(el => {
+      ["href","src","onclick"].forEach(attr => {
+        const val = el.getAttribute(attr);
+        if (val) {
+          const rx = /\bhttps?:\/\/[^\s"'<>]+/g;
+          let m; while ((m = rx.exec(val)) !== null) urls.add(normalizeSrc(absUrl(m[0], base)));
+        }
+      });
     });
-
-    // <iframe src> (relatívból abszolút)
-    doc.querySelectorAll("iframe[src]").forEach(f => {
-      const src = f.getAttribute("src");
-      if (src) urls.add(normalizeSrc(absUrl(src, base)));
-    });
-
-    // onclick-okból is URL-ek (itt tipikusan abszolútak)
-    doc.querySelectorAll("[onclick]").forEach(el => {
-      const txt = el.getAttribute("onclick") || "";
-      const rx = /\bhttps?:\/\/[^\s"'<>]+/g;
-      let m; while ((m = rx.exec(txt)) !== null) urls.add(normalizeSrc(m[0]));
-    });
-
     return Array.from(urls);
   } catch (e) {
     console.error("findLinksInDetailPage hiba:", e);
@@ -539,41 +487,22 @@ function pickPlayable(allUrls) {
   const playable = [];
   allUrls.forEach(u => {
     const n = normalizeSrc(u);
-    if (!n) return;
-    if (!isAllowedHost(n)) return;
+    if (!n || !isAllowedHost(n)) return;
     const embed = toEmbedUrl(n);
     if (!embed) return;
     const finalUrl = ensureAutoplay(embed);
     if (!seen.has(finalUrl)) {
       seen.add(finalUrl);
       const h = hostOf(finalUrl);
-      const label = h.includes("videa.hu") ? "Videa" :
-                    (h.includes("ok.ru")||h.includes("odnoklassniki.ru") ? "OK.ru" : ("Forrás: " + h));
+      const label = h.includes("videa.hu") ? "Videa" : (h.includes("ok.ru") ? "OK.ru" : ("Forrás: " + h));
       playable.push({ label, url: finalUrl });
     }
   });
   return playable;
 }
 
-/* --------- SxxEyy felismerése + epizód URL detektálás --------- */
-function parseSeasonEpisode(u) {
-  try {
-    const path = new URL(u).pathname.toLowerCase();
-    const m = path.match(/\/(\d+)-evad\/(\d+)-resz/);
-    if (m) return { s: parseInt(m[1], 10), e: parseInt(m[2], 10) };
-  } catch {}
-  return null;
-}
-function isMoziEpisodeLink(u) {
-  try {
-    const url = new URL(u);
-    if (!url.hostname.endsWith("mozikatalogus.hu")) return false;
-    return /\/\d+-evad\/\d+-resz/i.test(url.pathname);
-  } catch { return false; }
-}
-
-/* ---------- PLAYER: FILM (VÁLTOZATLAN LOGIKA) ---------- */
-async function loadPlayerFromFilm(film, fallbackLink) {
+/* -------- PLAYER -------- */
+async function loadPlayerFromFilm(filmObj, fallbackLink) {
   const iframe = document.getElementById("playerIframe");
   const epWrap = document.getElementById("episodeButtons");
   const modal  = document.getElementById("playerModal");
@@ -582,7 +511,7 @@ async function loadPlayerFromFilm(film, fallbackLink) {
   if (pre) pre.style.display = "block";
   if (epWrap) epWrap.innerHTML = "";
 
-  const fromFilm = Array.from(extractUrlsFromObject(film));
+  const fromFilm = Array.isArray(filmObj) || typeof filmObj === "object" ? Array.from(extractUrlsFromObject(filmObj)) : [];
   let playable = pickPlayable(fromFilm);
 
   if (playable.length === 0 && fallbackLink) {
@@ -595,8 +524,8 @@ async function loadPlayerFromFilm(film, fallbackLink) {
     if (epWrap && playable.length > 1) {
       playable.forEach((p,i) => {
         const b = document.createElement("button");
-        b.className = "episode-btn" + (i === 0 ? " active" : "");
-        b.textContent = p.label || ("Forrás " + (i+1));
+        b.className = "episode-btn" + (i===0?" active":"");
+        b.textContent = p.label;
         b.onclick = (e) => {
           e.preventDefault();
           if (iframe) iframe.src = p.url;
@@ -614,7 +543,6 @@ async function loadPlayerFromFilm(film, fallbackLink) {
   if (pre) pre.style.display = "none";
 }
 
-/* ---------- PLAYER: OLDAL (SOROZAT EPIZÓDOK BEJÁRÁSA) ---------- */
 async function loadPlayerFromPage(detailUrl) {
   const iframe = document.getElementById("playerIframe");
   const epWrap = document.getElementById("episodeButtons");
@@ -624,49 +552,16 @@ async function loadPlayerFromPage(detailUrl) {
   if (pre) pre.style.display = "block";
   if (epWrap) epWrap.innerHTML = "";
 
-  // 1) Részletoldal: közvetlen források (ha film vagy egyből van iframe)
   const fromDetail = await findLinksInDetailPage(detailUrl);
   let playable = pickPlayable(fromDetail);
 
-  // 2) Sorozat: epizód linkek kigyűjtése és epizódoldalak bejárása
-  const episodeLinks = fromDetail.filter(isMoziEpisodeLink);
-  if (episodeLinks.length) {
-    const epResults = await Promise.all(episodeLinks.map(async (epUrl) => {
-      const sub = await findLinksInDetailPage(epUrl);
-      const list = pickPlayable(sub);
-      const se = parseSeasonEpisode(epUrl);
-      const prefix = se ? `S${String(se.s).padStart(2,"0")}E${String(se.e).padStart(2,"0")}` : "Epizód";
-      return list.map(p => ({ url: p.url, label: `${prefix} · ${p.label || "Forrás"}` }));
-    }));
-
-    const seen = new Set(playable.map(x => x.url));
-    epResults.flat().forEach(p => {
-      if (!seen.has(p.url)) { seen.add(p.url); playable.push(p); }
-    });
-
-    // SxxEyy szerint rendezés, ha van
-    playable.sort((a,b) => {
-      const ma = a.label.match(/S(\d+)E(\d+)/);
-      const mb = b.label.match(/S(\d+)E(\d+)/);
-      if (ma && mb) {
-        const sa = parseInt(ma[1],10), ea = parseInt(ma[2],10);
-        const sb = parseInt(mb[1],10), eb = parseInt(mb[2],10);
-        if (sa !== sb) return sa - sb;
-        if (ea !== eb) return ea - eb;
-      }
-      return a.label.localeCompare(b.label);
-    });
-  }
-
-  // 3) Lejátszó + gombok
   if (playable.length > 0) {
     if (iframe) iframe.src = playable[0].url;
-
     if (epWrap && playable.length > 1) {
       playable.forEach((p,i) => {
         const b = document.createElement("button");
-        b.className = "episode-btn" + (i === 0 ? " active" : "");
-        b.textContent = p.label || ("Forrás " + (i+1));
+        b.className = "episode-btn" + (i===0?" active":"");
+        b.textContent = p.label;
         b.onclick = (e) => {
           e.preventDefault();
           if (iframe) iframe.src = p.url;
@@ -693,7 +588,7 @@ function closeModal() {
   if (epWrap) epWrap.innerHTML = "";
 }
 
-/* ---------- INIT ---------- */
+/* -------- INDÍTÁS -------- */
 fetchMovies();
 </script>
 </body>
